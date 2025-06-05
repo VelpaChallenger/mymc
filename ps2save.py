@@ -166,6 +166,11 @@ char_substs = {
 	u'\u30fc': u'-',
 }
 
+shiftj_to_ascii = {
+	0x3000: 0x20,
+	0x2212: 0x2D,
+}
+
 def shift_jis_conv(src, encoding = None):
 	"""Convert Shift-JIS strings to a graphically similar representation.
 
@@ -185,12 +190,21 @@ def shift_jis_conv(src, encoding = None):
 	a = []
 	for uc in u:
 		try:
-			uc.encode(encoding)
-			a.append(uc)
+			shift_j_offset = ord(uc)
+			if shift_j_offset < 0xFF03: #Special characters, not letters. But some of them still have a corresponding one. So far, only whitespace doesn't.
+				ascii_offset = shiftj_to_ascii.get(shift_j_offset, None)
+				if ascii_offset is None:
+					print(f"ERROR {shift_j_offset:02X} NOT ASCII FOUND")
+					input()
+				final_offset = chr(ascii_offset)
+			else:
+				ascii_offset = shift_j_offset - 0xFEE0
+				final_offset = chr(ascii_offset)
+			final_offset.encode(encoding)
+			a.append(final_offset)
 		except UnicodeError:
 			for uc2 in shift_jis_normalize_table.get(uc, uc):
 				a.append(char_substs.get(uc2, uc2))
-	
 	return u"".join(a).encode(encoding, "replace")
 
 def rc4_crypt(s, t):
@@ -242,8 +256,8 @@ def icon_sys_title(icon_sys, encoding = None):
 	
 	offset = icon_sys[1]
 	title = icon_sys[14]
-	title2 = shift_jis_conv(title[offset:], encoding)
-	title1 = shift_jis_conv(title[:offset], encoding)
+	title2 = shift_jis_conv(title[offset:], encoding).decode('utf-8')
+	title1 = shift_jis_conv(title[:offset], encoding).decode('utf-8')
 	return (title1, title2)
 
 def _read_fixed(f, n):
